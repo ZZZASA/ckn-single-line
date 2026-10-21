@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CKN Single Line</title>
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen viewer. A slim control bar and feeder chips sit over a full-bleed drawing stage */
+:root {
+  --bg: #eef0f4;
+  --panel: #ffffff;
+  --ink: #18202a;
+  --muted: #5c6877;
+  --line: #d4d9e1;
+  --stage: #dde1e8;
+  --accent: #6a2c91;
+  --accent-ink: #ffffff;
+  --accent-soft: #f0e8f6;
+  --hit: #e2560b;
+  --f-ui: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+  --f-code: "IBM Plex Mono", Consolas, ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --panel: #1a2029; --ink: #e3e8ef; --muted: #96a2b2; --line: #2d3542;
+    --stage: #0b0e13; --accent: #b98ce0; --accent-ink: #1a0d26; --accent-soft: #2a2036; --hit: #ff8d45;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --panel: #1a2029; --ink: #e3e8ef; --muted: #96a2b2; --line: #2d3542;
+  --stage: #0b0e13; --accent: #b98ce0; --accent-ink: #1a0d26; --accent-soft: #2a2036; --hit: #ff8d45;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 14px; overflow: hidden; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); }
+.app { height: 100%; display: flex; flex-direction: column; }
+
+.bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  position: relative; z-index: 5;
+}
+.id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mark {
+  font-family: var(--f-code); font-weight: 600; font-size: 13px; letter-spacing: .08em;
+  background: var(--accent); color: var(--accent-ink); padding: 6px 8px; border-radius: 4px;
+}
+.id h1 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; text-wrap: balance; }
+.id p { margin: 0; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.id > div { min-width: 0; }
+
+.search { position: relative; flex: 1 1 260px; min-width: 0; max-width: 460px; }
+.search input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px;
+}
+.search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.results {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; max-height: min(60vh, 420px); overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(10, 14, 20, .18); z-index: 20; padding: 4px;
+}
+.results .head { font-size: 12px; color: var(--muted); padding: 6px 10px 4px; }
+.results button {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%;
+  font: inherit; color: var(--ink); background: none; border: 0; border-radius: 5px;
+  padding: 7px 10px; text-align: left; cursor: pointer;
+}
+.results button:hover, .results button.on { background: var(--accent-soft); }
+.results .code { font-family: var(--f-code); font-weight: 500; font-size: 13px; }
+.results .kind { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+.btn {
+  font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); text-decoration: none;
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; line-height: 1.2;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible, .chip:focus-visible, .results button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn.sq { width: 32px; justify-content: center; padding: 6px 0; font-size: 16px; }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.zoom { font-family: var(--f-code); font-size: 12px; min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
+.sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+
+.chips {
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin;
+  padding-block: 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.chips .lbl { font-size: 12px; color: var(--muted); align-self: center; white-space: nowrap; margin-right: 4px; }
+.chip {
+  font-family: var(--f-code); font-size: 12px; color: var(--ink); white-space: nowrap; cursor: pointer;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+}
+.chip b { font-weight: 500; color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip.on b { color: inherit; }
+
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--stage); touch-action: none; cursor: grab; user-select: none; }
+.stage.drag { cursor: grabbing; }
+.sheet { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; box-shadow: 0 2px 18px rgba(0, 0, 0, .22); }
+.sheet canvas { display: block; }
+#detail { position: absolute; left: 0; top: 0; pointer-events: none; }
+.night .sheet, .night #detail { filter: invert(.92) hue-rotate(180deg); }
+#marks { position: absolute; inset: 0; pointer-events: none; }
+.m { position: absolute; border-radius: 50%; border: 2px solid var(--hit); box-sizing: border-box; transform: translate(-50%, -50%); opacity: .75; }
+.m.on { border-width: 3px; opacity: 1; box-shadow: 0 0 0 4px color-mix(in srgb, var(--hit) 30%, transparent); }
+@media (prefers-reduced-motion: no-preference) { .m.on { animation: pulse 1.4s ease-out 2; } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--hit) 60%, transparent); } 100% { box-shadow: 0 0 0 18px transparent; } }
+
+.hint {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 12px; white-space: nowrap; pointer-events: none; opacity: .92;
+}
+.status {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  font-size: 14px; color: var(--muted); padding: 24px; pointer-events: none;
+}
+.status span { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; max-width: 420px; }
+
+@media (max-width: 640px) {
+  .search { flex-basis: 100%; max-width: none; order: 3; }
+  .tools { margin-left: 0; order: 4; }
+  .hide-s { display: none; }
+  .hint { font-size: 11px; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="bar">
+    <div class="id">
+      <span class="mark">CKN</span>
+      <div>
+        <h1>แผนผังสวิตชิ่ง สถานีไฟฟ้าเชียงของ</h1>
+        <p id="meta">กฟส.เชียงของ และ กฟฟ.ในสังกัด</p>
+      </div>
+    </div>
+    <div class="search">
+      <input id="q" type="search" autocomplete="off" placeholder="ค้นหาอุปกรณ์หรือสถานที่ เช่น CKN03VS-110, ปากอิง" aria-label="ค้นหาในแบบ">
+      <div class="results" id="results" hidden></div>
+    </div>
+    <div class="tools">
+      <button class="btn sq" id="zout" title="ย่อ (−)" aria-label="ย่อ">−</button>
+      <span class="zoom" id="zpct">100%</span>
+      <button class="btn sq" id="zin" title="ขยาย (+)" aria-label="ขยาย">+</button>
+      <button class="btn" id="fitAll" title="ดูทั้งแบบ (0)">ทั้งแบบ</button>
+      <button class="btn" id="fitW" title="พอดีความกว้าง">พอดีความกว้าง</button>
+      <span class="sep hide-s"></span>
+      <button class="btn" id="night" aria-pressed="false" title="กลับสีแบบสำหรับดูในที่มืด">กลางคืน</button>
+      <label class="btn" for="file" title="เปิดไฟล์ PDF แบบฉบับใหม่จากเครื่อง">เปิดไฟล์แบบ</label>
+      <input id="file" type="file" accept="application/pdf,.pdf" hidden>
+      <a class="btn primary" id="pdfLink" href="drawing.pdf" target="_blank" rel="noopener">เปิด PDF</a>
+      <button class="btn sq hide-s" id="fs" title="เต็มจอ" aria-label="เต็มจอ">⛶</button>
+    </div>
+  </header>
+  <nav class="chips" id="chips" aria-label="ฟีดเดอร์" hidden></nav>
+  <main class="stage" id="stage">
+    <div class="sheet" id="sheet"><canvas id="base"></canvas></div>
+    <canvas id="detail" hidden></canvas>
+    <div id="marks"></div>
+    <div class="hint">ลากเพื่อเลื่อน · ล้อเมาส์หรือสองนิ้วเพื่อซูม · ดับเบิลคลิกเพื่อขยาย</div>
+    <div class="status" id="status"><span>กำลังเปิดแบบ…</span></div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="drawing-data.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const stage = $('stage'), sheet = $('sheet'), base = $('base'), detail = $('detail'), marksEl = $('marks'), q = $('q'), resultsEl = $('results');
+const CODE = /^([A-Z]{3}\d{2})V([A-Z])-\d{3}$/;
+const KIND = { S: 'สวิตช์ตัดตอน', F: 'ฟิวส์', R: 'รีโคลสเซอร์', C: 'คาปาซิเตอร์', B: 'เบรกเกอร์' };
+const MAX_Z = 16;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+let page = null, W = 0, H = 0, baseRes = 1;
+let z = 1, tx = 0, ty = 0, minZ = 0.05;
+let items = [], hits = [], active = -1, sel = -1, chipOn = '';
+let task = null, detailTimer = 0, renderSeq = 0;
+
+// Thai text from the PDF stores sara am as nikhahit + sara aa; fold both forms together
+const norm = s => s.replace(/ํา/g, 'ำ').replace(/\s+/g, ' ').trim().toLowerCase();
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+function setStatus(t) { const s = $('status'); s.hidden = !t; if (t) s.firstElementChild.textContent = t; }
+
+function b64ToBytes(b) {
+  const s = atob(b), u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+  return u;
+}
+
+async function load(data, label) {
+  setStatus('กำลังเปิดแบบ…');
+  try {
+    const doc = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
+    page = await doc.getPage(1);
+    const vp = page.getViewport({ scale: 1 });
+    W = vp.width; H = vp.height;
+    await renderBase();
+    await indexText(vp);
+    $('meta').textContent = `${label} · ${doc.numPages} หน้า · ${items.filter(i => i.code).length} อุปกรณ์ที่อ่านได้`;
+    fitAll(false);
+    setStatus('');
+  } catch (e) {
+    setStatus('เปิดแบบไม่ได้ (' + (e && e.message || e) + ') ลองกด "เปิดไฟล์แบบ" แล้วเลือกไฟล์ PDF อีกครั้ง');
+  }
+}
+
+async function renderBase() {
+  baseRes = Math.min(3, Math.sqrt(9e6 / (W * H)));
+  const vp = page.getViewport({ scale: baseRes });
+  base.width = Math.floor(vp.width); base.height = Math.floor(vp.height);
+  base.style.width = W + 'px'; base.style.height = H + 'px';
+  sheet.style.width = W + 'px'; sheet.style.height = H + 'px';
+  await page.render({ canvasContext: base.getContext('2d'), viewport: vp }).promise;
+}
+
+async function indexText(vp) {
+  const tc = await page.getTextContent();
+  items = tc.items.filter(i => i.str && i.str.trim()).map(i => {
+    const t = pdfjsLib.Util.transform(vp.transform, i.transform);
+    const h = Math.hypot(t[2], t[3]) || 4;
+    const w = i.width || h * i.str.length * 0.5;
+    const a = Math.atan2(t[1], t[0]);
+    const str = i.str.trim();
+    const m = str.match(CODE);
+    return {
+      str, n: norm(str), code: m ? m[1] : '', kind: m ? (KIND[m[2]] || 'อุปกรณ์') : '',
+      cx: t[4] + Math.cos(a) * w / 2 + Math.sin(a) * h / 2,
+      cy: t[5] + Math.sin(a) * w / 2 - Math.cos(a) * h / 2,
+      r: Math.max(w, h) / 2 + 3
+    };
+  });
+  buildChips();
+}
+
+function buildChips() {
+  const count = {};
+  items.forEach(i => { if (i.code) count[i.code] = (count[i.code] || 0) + 1; });
+  const keys = Object.keys(count).sort();
+  const nav = $('chips');
+  nav.innerHTML = '<span class="lbl">ฟีดเดอร์</span>' + keys.map(k =>
+    `<button class="chip" data-k="${k}">${k}<b>${count[k]}</b></button>`).join('');
+  nav.hidden = !keys.length;
+}
+
+$('chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  const k = b.dataset.k;
+  chipOn = chipOn === k ? '' : k;
+  q.value = chipOn;
+  runSearch(true);
+});
+
+// ---------- view transform ----------
+function stageSize() { return { sw: stage.clientWidth, sh: stage.clientHeight }; }
+
+function apply() {
+  const { sw, sh } = stageSize();
+  tx = clamp(tx, 60 - W * z, sw - 60);
+  ty = clamp(ty, 60 - H * z, sh - 60);
+  sheet.style.transform = `translate(${tx}px,${ty}px) scale(${z})`;
+  $('zpct').textContent = Math.round(z * 100) + '%';
+  placeMarks();
+  detail.hidden = true;
+  if (task) { task.cancel(); task = null; }
+  clearTimeout(detailTimer);
+  detailTimer = setTimeout(renderDetail, 160);
+}
+
+function zoomAt(cx, cy, nz) {
+  nz = clamp(nz, minZ, MAX_Z);
+  tx = cx - (cx - tx) * nz / z;
+  ty = cy - (cy - ty) * nz / z;
+  z = nz;
+}
+
+function animateTo(nz, ntx, nty) {
+  if (reduceMotion) { z = nz; tx = ntx; ty = nty; apply(); return; }
+  const z0 = z, x0 = tx, y0 = ty, t0 = performance.now(), dur = 260;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    z = z0 + (nz - z0) * e; tx = x0 + (ntx - x0) * e; ty = y0 + (nty - y0) * e;
+    apply();
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function fitAll(anim = true) {
+  if (!W) return;
+  const { sw, sh } = stageSize();
+  const nz = Math.min(sw / W, sh / H) * 0.96;
+  minZ = nz * 0.5;
+  const nx = (sw - W * nz) / 2, ny = (sh - H * nz) / 2;
+  anim ? animateTo(nz, nx, ny) : (z = nz, tx = nx, ty = ny, apply());
+}
+function fitWidth() {
+  if (!W) return;
+  const { sw } = stageSize();
+  const nz = (sw - 24) / W;
+  animateTo(nz, 12, 12);
+}
+function zoomBy(k) { const { sw, sh } = stageSize(); const nz = clamp(z * k, minZ, MAX_Z); animateTo(nz, sw / 2 - (sw / 2 - tx) * nz / z, sh / 2 - (sh / 2 - ty) * nz / z); }
+
+async function renderDetail() {
+  if (!page) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (z * dpr <= baseRes * 1.05) return;
+  const { sw, sh } = stageSize();
+  const seq = ++renderSeq;
+  const off = document.createElement('canvas');
+  off.width = Math.ceil(sw * dpr); off.height = Math.ceil(sh * dpr);
+  const ctx = off.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(tx * dpr, ty * dpr, W * z * dpr, H * z * dpr);
+  const vp = page.getViewport({ scale: z * dpr, offsetX: tx * dpr, offsetY: ty * dpr });
+  const t = page.render({ canvasContext: ctx, viewport: vp, background: 'rgba(0,0,0,0)' });
+  task = t;
+  try { await t.promise; } catch (e) { return; }
+  if (seq !== renderSeq || task !== t) return;
+  task = null;
+  detail.width = off.width; detail.height = off.height;
+  detail.style.width = sw + 'px'; detail.style.height = sh + 'px';
+  detail.getContext('2d').drawImage(off, 0, 0);
+  detail.hidden = false;
+}
+
+// ---------- pointer: drag to pan, two fingers to zoom ----------
+const pts = new Map();
+let last = null;
+function gesture() {
+  const r = stage.getBoundingClientRect(), a = [...pts.values()];
+  const cx = a.reduce((s, p) => s + p.x, 0) / a.length - r.left;
+  const cy = a.reduce((s, p) => s + p.y, 0) / a.length - r.top;
+  const d = a.length > 1 ? Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) : 1;
+  return { n: a.length, cx, cy, d };
+}
+stage.addEventListener('pointerdown', e => {
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  stage.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  last = gesture();
+  stage.classList.add('drag');
+  closeResults();
+});
+stage.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const g = gesture();
+  if (last && g.n === last.n) {
+    if (g.n >= 2 && last.d > 0) zoomAt(last.cx, last.cy, z * g.d / last.d);
+    tx += g.cx - last.cx; ty += g.cy - last.cy;
+    apply();
+  }
+  last = g;
+});
+function endPointer(e) {
+  pts.delete(e.pointerId);
+  last = pts.size ? gesture() : null;
+  if (!pts.size) stage.classList.remove('drag');
+}
+stage.addEventListener('pointerup', endPointer);
+stage.addEventListener('pointercancel', endPointer);
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = stage.getBoundingClientRect();
+  const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+  zoomAt(e.clientX - r.left, e.clientY - r.top, z * Math.exp(-dy * 0.0015));
+  apply();
+}, { passive: false });
+stage.addEventListener('dblclick', e => {
+  const r = stage.getBoundingClientRect(), cx = e.clientX - r.left, cy = e.clientY - r.top;
+  const nz = clamp(z * 2, minZ, MAX_Z);
+  animateTo(nz, cx - (cx - tx) * nz / z, cy - (cy - ty) * nz / z);
+});
+
+// ---------- search ----------
+function runSearch(open) {
+  const s = norm(q.value);
+  if (chipOn && q.value !== chipOn) chipOn = '';
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.k === chipOn));
+  hits = s ? items.filter(i => i.n.includes(s)) : [];
+  active = -1; sel = -1;
+  marksEl.innerHTML = hits.map(() => '<div class="m"></div>').join('');
+  placeMarks();
+  renderResults(open);
+}
+
+function renderResults(open) {
+  if (!norm(q.value)) { closeResults(); return; }
+  const shown = hits.slice(0, 80);
+  resultsEl.innerHTML =
+    `<div class="head">${hits.length ? `พบ ${hits.length} จุดในแบบ` : 'ไม่พบในแบบ ลองพิมพ์บางส่วน เช่น VS-110 หรือชื่อหมู่บ้าน'}${hits.length > shown.length ? ` · แสดง ${shown.length} รายการแรก` : ''}</div>` +
+    shown.map((h, k) => `<button data-k="${k}" class="${k === sel ? 'on' : ''}"><span class="${h.code ? 'code' : ''}">${esc(h.str)}</span><span class="kind">${h.kind || 'ข้อความในแบบ'}</span></button>`).join('');
+  resultsEl.hidden = !open;
+}
+function closeResults() { resultsEl.hidden = true; }
+function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function placeMarks() {
+  const els = marksEl.children;
+  for (let k = 0; k < els.length; k++) {
+    const h = hits[k], el = els[k], d = Math.max(18, h.r * 2 * z);
+    el.style.left = (tx + h.cx * z) + 'px';
+    el.style.top = (ty + h.cy * z) + 'px';
+    el.style.width = el.style.height = d + 'px';
+    el.classList.toggle('on', k === active);
+  }
+}
+
+function focusHit(k) {
+  if (!hits[k]) return;
+  active = k; sel = k;
+  const h = hits[k], { sw, sh } = stageSize();
+  const nz = clamp(Math.max(z, 2.5), minZ, MAX_Z);
+  animateTo(nz, sw / 2 - h.cx * nz, sh / 2 - h.cy * nz);
+  [...resultsEl.querySelectorAll('button')].forEach(b => b.classList.toggle('on', +b.dataset.k === k));
+}
+
+q.addEventListener('input', () => runSearch(true));
+q.addEventListener('focus', () => { if (norm(q.value)) renderResults(true); });
+q.addEventListener('keydown', e => {
+  const n = Math.min(hits.length, 80);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); if (!n) return;
+    sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+    renderResults(true);
+    resultsEl.querySelector('button.on')?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault(); if (!n) return;
+    focusHit(sel >= 0 ? sel : (active + 1) % n);
+  } else if (e.key === 'Escape') { closeResults(); q.blur(); }
+});
+resultsEl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) focusHit(+b.dataset.k); });
+document.addEventListener('pointerdown', e => { if (!e.target.closest('.search')) closeResults(); });
+
+// ---------- toolbar ----------
+$('zin').onclick = () => zoomBy(1.5);
+$('zout').onclick = () => zoomBy(1 / 1.5);
+$('fitAll').onclick = () => fitAll();
+$('fitW').onclick = fitWidth;
+$('night').onclick = e => {
+  const on = stage.classList.toggle('night');
+  e.currentTarget.setAttribute('aria-pressed', on);
+  try { localStorage.setItem('ckn-night', on ? '1' : ''); } catch (err) {}
+};
+try { if (localStorage.getItem('ckn-night')) { stage.classList.add('night'); $('night').setAttribute('aria-pressed', 'true'); } } catch (err) {}
+$('fs').onclick = () => {
+  const el = $('app');
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+};
+$('file').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const d = new Date(f.lastModified).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  $('pdfLink').href = URL.createObjectURL(f);
+  q.value = ''; chipOn = '';
+  await load(new Uint8Array(await f.arrayBuffer()), `${f.name} · แก้ไข ${d}`);
+  runSearch(false);
+});
+window.addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea')) return;
+  if (e.key === '+' || e.key === '=') zoomBy(1.5);
+  else if (e.key === '-') zoomBy(1 / 1.5);
+  else if (e.key === '0') fitAll();
+  else if (e.key === '/') { e.preventDefault(); q.focus(); }
+});
+new ResizeObserver(() => { if (W) apply(); }).observe(stage);
+
+// ---------- start ----------
+if (!window.pdfjsLib) setStatus('โหลดตัวอ่าน PDF ไม่ได้ ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วรีเฟรชหน้า');
+else if (window.CKN_PDF) {
+  const d = new Date(CKN_PDF.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  load(b64ToBytes(CKN_PDF.data), `${CKN_PDF.name} · ${d}`);
+} else setStatus('ยังไม่มีไฟล์แบบ กด "เปิดไฟล์แบบ" เพื่อเลือกไฟล์ PDF');
+</script>
+
+</body></html>
