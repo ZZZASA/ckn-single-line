@@ -115,7 +115,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .view { position: absolute; inset: 0; overflow: hidden; }
 .sheet { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; outline: 1px solid rgba(0, 0, 0, .18); }
 .sheet canvas { display: block; }
-#detail { position: absolute; left: 0; top: 0; pointer-events: none; }
+#detail { position: absolute; left: 0; top: 0; pointer-events: none; transform-origin: 0 0; }
 .night .view { filter: invert(.92) hue-rotate(180deg); }
 #marks { position: absolute; inset: 0; pointer-events: none; }
 .m { position: absolute; border-radius: 50%; border: 2px solid var(--hit); box-sizing: border-box; transform: translate(-50%, -50%); opacity: .75; }
@@ -203,6 +203,8 @@ let page = null, W = 0, H = 0, baseRes = 1;
 let z = 1, tx = 0, ty = 0, minZ = 0.05;
 let items = [], hits = [], active = -1, sel = -1, chipOn = '';
 let task = null, detailTimer = 0, renderSeq = 0;
+// view (z, tx, ty) the sharp detail canvas was rendered for; it is moved/scaled with CSS while panning or pinching
+let dz = 1, dtx = 0, dty = 0;
 
 // Thai text from the PDF stores sara am as nikhahit + sara aa; fold both forms together
 const norm = s => s.replace(/ํา/g, 'ำ').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -222,6 +224,7 @@ async function load(data, label) {
     page = await doc.getPage(1);
     const vp = page.getViewport({ scale: 1 });
     W = vp.width; H = vp.height;
+    detail.hidden = true;
     await renderBase();
     await indexText(vp);
     $('meta').textContent = `${label} · ${doc.numPages} หน้า · ${items.filter(i => i.code).length} อุปกรณ์ที่อ่านได้`;
@@ -288,9 +291,15 @@ function apply() {
   sheet.style.transform = `translate(${tx}px,${ty}px) scale(${z})`;
   $('zpct').textContent = Math.round(z * 100) + '%';
   placeMarks();
-  detail.hidden = true;
+  placeDetail();
   if (task) { task.cancel(); task = null; }
   scheduleDetail();
+}
+// Keep the sharp layer on screen and move it with the drawing, instead of hiding it and flashing the blurry base
+function placeDetail() {
+  if (detail.hidden) return;
+  const k = z / dz;
+  detail.style.transform = `translate(${tx - dtx * k}px,${ty - dty * k}px) scale(${k})`;
 }
 function scheduleDetail() {
   clearTimeout(detailTimer);
@@ -338,8 +347,9 @@ async function renderDetail() {
   if (!page || pts.size) return;
   const { sw, sh } = stageSize();
   const dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(DETAIL_PX / (sw * sh)));
-  if (z * dpr <= baseRes * 1.05) return;
+  if (z * dpr <= baseRes * 1.05) { detail.hidden = true; return; }
   const seq = ++renderSeq;
+  const rz = z, rtx = tx, rty = ty;
   const ow = Math.ceil(sw * dpr), oh = Math.ceil(sh * dpr);
   if (off.width !== ow || off.height !== oh) { off.width = ow; off.height = oh; }
   const ctx = off.getContext('2d');
@@ -358,7 +368,9 @@ async function renderDetail() {
   const dctx = detail.getContext('2d');
   dctx.clearRect(0, 0, ow, oh);
   dctx.drawImage(off, 0, 0);
+  dz = rz; dtx = rtx; dty = rty;
   detail.hidden = false;
+  placeDetail();
 }
 
 // ---------- pointer: drag to pan, two fingers to zoom ----------
