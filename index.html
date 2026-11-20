@@ -112,10 +112,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
 .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--stage); touch-action: none; cursor: grab; user-select: none; }
 .stage.drag { cursor: grabbing; }
-.sheet { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; box-shadow: 0 2px 18px rgba(0, 0, 0, .22); }
+.view { position: absolute; inset: 0; overflow: hidden; }
+.sheet { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; outline: 1px solid rgba(0, 0, 0, .18); }
 .sheet canvas { display: block; }
 #detail { position: absolute; left: 0; top: 0; pointer-events: none; }
-.night .sheet, .night #detail { filter: invert(.92) hue-rotate(180deg); }
+.night .view { filter: invert(.92) hue-rotate(180deg); }
 #marks { position: absolute; inset: 0; pointer-events: none; }
 .m { position: absolute; border-radius: 50%; border: 2px solid var(--hit); box-sizing: border-box; transform: translate(-50%, -50%); opacity: .75; }
 .m.on { border-width: 3px; opacity: 1; box-shadow: 0 0 0 4px color-mix(in srgb, var(--hit) 30%, transparent); }
@@ -172,8 +173,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   </header>
   <nav class="chips" id="chips" aria-label="ฟีดเดอร์" hidden></nav>
   <main class="stage" id="stage">
-    <div class="sheet" id="sheet"><canvas id="base"></canvas></div>
-    <canvas id="detail" hidden></canvas>
+    <div class="view" id="view">
+      <div class="sheet" id="sheet"><canvas id="base"></canvas></div>
+      <canvas id="detail" hidden></canvas>
+    </div>
     <div id="marks"></div>
     <div class="hint">ลากเพื่อเลื่อน · ล้อเมาส์หรือสองนิ้วเพื่อซูม · ดับเบิลคลิกเพื่อขยาย</div>
     <div class="status" id="status"><span>กำลังเปิดแบบ…</span></div>
@@ -181,7 +184,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script src="drawing-data.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -189,6 +191,10 @@ const stage = $('stage'), sheet = $('sheet'), base = $('base'), detail = $('deta
 const CODE = /^([A-Z]{3}\d{2})V([A-Z])-\d{3}$/;
 const KIND = { S: 'สวิตช์ตัดตอน', F: 'ฟิวส์', R: 'รีโคลสเซอร์', C: 'คาปาซิเตอร์', B: 'เบรกเกอร์' };
 const MAX_Z = 16;
+// iOS Safari kills the tab (black screen) once canvas memory passes its limit, so keep pixel budgets small on touch devices
+const MOBILE = matchMedia('(pointer: coarse)').matches || /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const BASE_PX = MOBILE ? 4e6 : 9e6;
+const DETAIL_PX = MOBILE ? 3e6 : 8e6;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -227,7 +233,7 @@ async function load(data, label) {
 }
 
 async function renderBase() {
-  baseRes = Math.min(3, Math.sqrt(9e6 / (W * H)));
+  baseRes = Math.min(3, Math.sqrt(BASE_PX / (W * H)));
   const vp = page.getViewport({ scale: baseRes });
   base.width = Math.floor(vp.width); base.height = Math.floor(vp.height);
   base.style.width = W + 'px'; base.style.height = H + 'px';
@@ -284,8 +290,11 @@ function apply() {
   placeMarks();
   detail.hidden = true;
   if (task) { task.cancel(); task = null; }
+  scheduleDetail();
+}
+function scheduleDetail() {
   clearTimeout(detailTimer);
-  detailTimer = setTimeout(renderDetail, 160);
+  if (!pts.size) detailTimer = setTimeout(renderDetail, 200);
 }
 
 function zoomAt(cx, cy, nz) {
@@ -323,15 +332,19 @@ function fitWidth() {
 }
 function zoomBy(k) { const { sw, sh } = stageSize(); const nz = clamp(z * k, minZ, MAX_Z); animateTo(nz, sw / 2 - (sw / 2 - tx) * nz / z, sh / 2 - (sh / 2 - ty) * nz / z); }
 
+// One reusable offscreen buffer: creating a new canvas per render leaks memory on iOS until the tab is killed
+const off = document.createElement('canvas');
 async function renderDetail() {
-  if (!page) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  if (z * dpr <= baseRes * 1.05) return;
+  if (!page || pts.size) return;
   const { sw, sh } = stageSize();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(DETAIL_PX / (sw * sh)));
+  if (z * dpr <= baseRes * 1.05) return;
   const seq = ++renderSeq;
-  const off = document.createElement('canvas');
-  off.width = Math.ceil(sw * dpr); off.height = Math.ceil(sh * dpr);
+  const ow = Math.ceil(sw * dpr), oh = Math.ceil(sh * dpr);
+  if (off.width !== ow || off.height !== oh) { off.width = ow; off.height = oh; }
   const ctx = off.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, ow, oh);
   ctx.fillStyle = '#fff';
   ctx.fillRect(tx * dpr, ty * dpr, W * z * dpr, H * z * dpr);
   const vp = page.getViewport({ scale: z * dpr, offsetX: tx * dpr, offsetY: ty * dpr });
@@ -340,9 +353,11 @@ async function renderDetail() {
   try { await t.promise; } catch (e) { return; }
   if (seq !== renderSeq || task !== t) return;
   task = null;
-  detail.width = off.width; detail.height = off.height;
+  if (detail.width !== ow || detail.height !== oh) { detail.width = ow; detail.height = oh; }
   detail.style.width = sw + 'px'; detail.style.height = sh + 'px';
-  detail.getContext('2d').drawImage(off, 0, 0);
+  const dctx = detail.getContext('2d');
+  dctx.clearRect(0, 0, ow, oh);
+  dctx.drawImage(off, 0, 0);
   detail.hidden = false;
 }
 
@@ -378,7 +393,7 @@ stage.addEventListener('pointermove', e => {
 function endPointer(e) {
   pts.delete(e.pointerId);
   last = pts.size ? gesture() : null;
-  if (!pts.size) stage.classList.remove('drag');
+  if (!pts.size) { stage.classList.remove('drag'); scheduleDetail(); }
 }
 stage.addEventListener('pointerup', endPointer);
 stage.addEventListener('pointercancel', endPointer);
